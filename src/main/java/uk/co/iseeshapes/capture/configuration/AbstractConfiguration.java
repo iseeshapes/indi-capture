@@ -5,7 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import uk.co.iseeshapes.capture.AbortException;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintStream;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

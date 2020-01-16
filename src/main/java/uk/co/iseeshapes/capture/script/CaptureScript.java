@@ -3,36 +3,71 @@ package uk.co.iseeshapes.capture.script;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import uk.co.iseeshapes.capture.AbortException;
-import uk.co.iseeshapes.capture.configuration.ApplicationConfiguration;
 import uk.co.iseeshapes.capture.configuration.CaptureConfiguration;
-import uk.co.iseeshapes.capture.device.Camera;
+import uk.co.iseeshapes.capture.configuration.ConfigurationManager;
+import uk.co.iseeshapes.capture.configuration.DeviceConfiguration;
+import uk.co.iseeshapes.capture.controller.CCDExposureController;
+import uk.co.iseeshapes.capture.controller.CCDTemperatureController;
+import uk.co.iseeshapes.capture.controller.CCDUploadController;
+import uk.co.iseeshapes.capture.controller.DeviceConnectionController;
 import uk.co.iseeshapes.capture.device.UploadMode;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class CaptureScript {
+public class CaptureScript extends AbstractScript {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(CaptureScript.class);
 
-    private static final SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd-hhmmss");
-    private static final double timeout = 10.0;
-    private static final long exposureSleepTime = 500;
-    private static final long downloadSleepTime = 100;
+    private static final String shortCameraArgument = "-k";
+    private static final String longCameraArgument = "--camera";
+    private static final String environmentCameraVariable = null;
+    private static final String localCameraFilename = "camera.json";
 
-    private static Pattern filenamePattern = Pattern.compile("(.*)-(\\d+)s([+-]\\d+)c-(\\d+)-(\\d{8}-\\d{6})\\.fits");
+    private static final String shortCaptureArgument = "-c";
+    private static final String longCaptureArgument = "--capture";
+    private static final String environmentCaptureVariable = null;
+    private static final String localCaptureFilename = "capture.json";
 
-    private ApplicationConfiguration applicationConfiguration;
-    private Camera camera;
-    private PrintStream out;
+    private static final Pattern filenamePattern = Pattern.compile("(.*)-(\\d+)s([+-]\\d+)c-(\\d+)-(\\d{8}-\\d{6})\\.fits");
 
-    public CaptureScript(ApplicationConfiguration applicationConfiguration, Camera camera, PrintStream out) {
-        this.applicationConfiguration = applicationConfiguration;
-        this.camera = camera;
-        this.out = out;
+    private final SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd-hhmmss");
+
+    private DeviceConfiguration camera;
+    private CaptureConfiguration captureConfiguration;
+
+    public CaptureScript(ConfigurationManager configurationManager) {
+        super(configurationManager);
+    }
+
+    @Override
+    public void initialise(String[] args, BufferedReader reader, PrintStream out) throws IOException, AbortException {
+        super.initialise(args, reader, out);
+
+        camera = configurationManager.findConfiguration(args, shortCameraArgument,
+                longCameraArgument, environmentCameraVariable, localCameraFilename, DeviceConfiguration.class);
+        if (camera == null) {
+            camera = new DeviceConfiguration("Camera");
+        }
+        camera.setStreams(out, reader);
+        camera.assignDevice(indiServerConnection.getDeviceNames());
+        configurationManager.writeConfiguration(localCameraFilename, camera);
+
+        captureConfiguration = configurationManager.findConfiguration(args, shortCaptureArgument,
+                longCaptureArgument, environmentCaptureVariable, localCaptureFilename,
+                CaptureConfiguration.class);
+        if (captureConfiguration == null) {
+            captureConfiguration = new CaptureConfiguration();
+        }
+        captureConfiguration.setStreams(out, reader);
+        captureConfiguration.ask();
+        configurationManager.writeConfiguration(localCaptureFilename, captureConfiguration);
     }
 
     private File createFilename (File directory, CaptureConfiguration captureConfiguration) {
@@ -46,12 +81,9 @@ public class CaptureScript {
             for (File file : files) {
                 Matcher matcher = filenamePattern.matcher(file.getName());
                 if (matcher.matches()) {
-                    if (!prefix.equals(matcher.group(1))) {
-                        continue;
-                    }
                     try {
                         int duration = Integer.parseInt(matcher.group(2));
-                        if (duration != exposure) {
+                        if (!prefix.equals(matcher.group(1)) || duration != exposure) {
                             continue;
                         }
                         int fileFrameNumber = Integer.parseInt(matcher.group(4));
@@ -59,7 +91,7 @@ public class CaptureScript {
                             frameNumber = fileFrameNumber;
                         }
                     } catch (NumberFormatException e) {
-                        continue;
+                        //do nothing
                     }
                 }
             }
@@ -72,109 +104,41 @@ public class CaptureScript {
         return new File(directory, filename);
     }
 
-    private int calculateExposureSeconds (double exposure) {
-        return (int)Math.ceil(exposure);
-    }
-
-    private long calculateExposureMilliseconds (double exposure) {
-        return calculateExposureSeconds(exposure) * 1000L;
-    }
-
-    private void updateConsole (File file, long exposure, long exposureMilliseconds,
-                                int noOfFrames, int imageNumber, long time) {
-        String lineStart = String.format("\r%3d of %3d => %s ", imageNumber, noOfFrames, file.getName());
-
-        int percent = (int)Math.round((double)(time * 100)/exposureMilliseconds);
-        String lineEnd = String.format(" %3d/%3d (%2d%%)", time / 1000, exposure, percent);
-
-        out.print(lineStart);
-
-        int steps = applicationConfiguration.getLineLength() - lineStart.length() - lineEnd.length();
-        long step = exposureMilliseconds / steps;
-        long position = 0;
-        while (position < time) {
-            out.print("=");
-            position += step;
-        }
-        if (position < exposureMilliseconds) {
-            out.print(">");
-            position += step;
-        }
-        while (position < exposureMilliseconds) {
-            out.print(" ");
-            position += step;
-        }
-        out.print(lineEnd);
-    }
-
-    private void clearLine () {
-        out.print("\r");
-        for (int i=0;i<applicationConfiguration.getLineLength();i++) {
-            out.print(" ");
-        }
-    }
-
-    private void downloadImage (int imageNumber, CaptureConfiguration captureConfiguration, File file) throws AbortException {
-        clearLine();
-        long start = new Date().getTime();
-        double time;
-        while (true) {
-            time = (double)(new Date().getTime() - start) / 1000;
-            out.printf("\rDownloading %s (%5.2fs)", file.getName(), time);
-            if (file.exists()) {
-                break;
-            }
-            if (time > timeout) {
-                //camera.getImageData();
-                throw new AbortException(String.format("Failed to download %s in %2.1f", file.getName(), timeout));
-            }
-            try {
-                Thread.sleep(downloadSleepTime);
-            } catch (InterruptedException e) {
-                //do nothing
-            }
-        }
-        clearLine();
-        out.printf("\rCompleted - %d of %d - %s%n", imageNumber, captureConfiguration.getNoOfFrames(), file.getName());
-    }
-
     private void captureImage (File directory, CaptureConfiguration captureConfiguration, int imageNumber)
-            throws AbortException {
-        long exposure = calculateExposureSeconds(captureConfiguration.getExposure());
-        long exposureMilliseconds = calculateExposureMilliseconds(captureConfiguration.getExposure());
-        long exposureRemaining;
+            throws AbortException, IOException {
 
         File file = createFilename(directory, captureConfiguration);
-        camera.setFile(file);
-        camera.setExposure(captureConfiguration.getExposure(), true);
-
-        while(true) {
-            exposureRemaining = calculateExposureMilliseconds(camera.getExposure());
-            log.info ("Remaining: {}", exposureRemaining);
-            updateConsole(file, exposure, exposureMilliseconds,
-                    captureConfiguration.getNoOfFrames(), imageNumber, exposureMilliseconds - exposureRemaining);
-            if (exposureRemaining - exposureSleepTime > 0) {
-                try {
-                    Thread.sleep(exposureSleepTime);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            } else {
-                break;
-            }
+        CCDExposureController ccdExposureController;
+        CCDUploadController ccdUploadController = new CCDUploadController(indiConnection, indiServerConnection,
+                camera.getDeviceName());
+        if (captureConfiguration.getExposure() > 2.0) {
+            ccdUploadController.sendUploadMode(UploadMode.local);
+            ccdExposureController = new CCDExposureController(indiConnection, indiServerConnection,
+                    out, applicationConfiguration, 0.25, 0, file, imageNumber,
+                    camera.getDeviceName(), UploadMode.local, true);
+            ccdExposureController.start();
         }
-        //camera.getImageData();
-        downloadImage(imageNumber, captureConfiguration, file);
+        ccdUploadController.sendUploadMode(UploadMode.client);
+        ccdExposureController = new CCDExposureController(indiConnection, indiServerConnection,
+                out, applicationConfiguration, captureConfiguration.getExposure(), captureConfiguration.getNoOfFrames(),
+                file, imageNumber, camera.getDeviceName(), UploadMode.client, false);
+        ccdExposureController.start();
     }
 
-    public void run (CaptureConfiguration captureConfiguration) throws AbortException {
-        if (!camera.isConnected()) {
-            camera.setConnected(true);
+    @Override
+    public void run () throws AbortException, IOException {
+        DeviceConnectionController deviceConnectionController = new DeviceConnectionController(indiConnection,
+                indiServerConnection, camera.getDeviceName());
+        if (!deviceConnectionController.isConnected()) {
+            deviceConnectionController.connect();
         }
-        camera.setUploadMode(UploadMode.local);
         File directory = new File(System.getProperty("user.dir"));
-        //File directory = new File("/home/eliot/indi-test");
-        //camera.setTemperature();
+
+        CCDTemperatureController ccdTemperatureController = new CCDTemperatureController(indiServerConnection,
+                indiConnection, applicationConfiguration, out, camera.getDeviceName(),
+                captureConfiguration.getTemperature(), captureConfiguration.getTolerance());
+        ccdTemperatureController.start();
+
         for (int i = 0; i < captureConfiguration.getNoOfFrames(); i++) {
             captureImage(directory, captureConfiguration, i + 1);
         }

@@ -1,1 +1,1 @@
-java -cp build/libs/capture.jar uk.co.iseeshapes.capture.Main
+java -cp build/libs/capture.jar uk.co.iseeshapes.capture.Main capture
