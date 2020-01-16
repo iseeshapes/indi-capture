@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://oss.sonatype.org/content/repositories/snapshots'
+    }
+}
+
+dependencies {
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.3'
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.28'
+    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.28'
+    implementation 'org.indilib.i4j:i4j-client:1.50-SNAPSHOT'
+    implementation 'org.indilib.i4j:i4j-client-examples:1.50-SNAPSHOT'
+}
+
+jar {
+    manifest {
+        attributes "Main-Class": "uk.co.iseeshapes.capture.Main"
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        //configurations.runtimeClasspath
+    }
+}
+
+//task copyDependencies (type: Copy){
+//    from configurations.runtimeClasspath
+//    into "$buildDir/libs"
+//}
+//
+//task simpleTest(type: JavaExec, dependsOn: copyDependencies) {
+//    classpath = files("$buildDir/libs/*")
+//    main = 'uk.co.iseeshapes.capture.Connection'
+//}
