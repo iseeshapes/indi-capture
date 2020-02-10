@@ -7,10 +7,11 @@ ext {
 }
 
 repositories {
-    mavenCentral()
+    mavenLocal()
     maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots'
     }
+    mavenCentral()
 }
 
 dependencies {
@@ -31,6 +32,7 @@ jar {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
         //configurations.runtimeClasspath
     }
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 //task copyDependencies (type: Copy){

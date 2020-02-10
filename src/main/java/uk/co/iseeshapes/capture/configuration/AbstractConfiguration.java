@@ -33,7 +33,11 @@ public abstract class AbstractConfiguration {
         while (true) {
             out.print(field);
             if (defaultValue != null) {
-                out.print(" (" + defaultValue + ")");
+                if (defaultValue instanceof Boolean) {
+                    out.printf(" (%s)", (boolean)defaultValue ? "y" : "n");
+                } else {
+                    out.print(" (" + defaultValue + ")");
+                }
             }
             out.print(": ");
 

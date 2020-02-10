@@ -24,9 +24,9 @@ public class Main {
         try {
             script.initialise(args, reader, System.out);
             script.run();
-            script.finish();
         } catch (AbortException | IOException e) {
             log.error("Script Failed", e);
         }
+        System.exit(0);
     }
 }

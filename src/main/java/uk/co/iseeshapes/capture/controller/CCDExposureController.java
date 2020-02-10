@@ -1,21 +1,20 @@
 package uk.co.iseeshapes.capture.controller;
 
 import org.indilib.i4j.Constants;
-import org.indilib.i4j.Constants.PropertyStates;
 import org.indilib.i4j.client.*;
 import org.indilib.i4j.protocol.NewNumberVector;
 import org.indilib.i4j.protocol.OneNumber;
 import org.indilib.i4j.protocol.api.INDIConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import uk.co.iseeshapes.capture.configuration.ApplicationConfiguration;
-import uk.co.iseeshapes.capture.device.UploadMode;
+import uk.co.iseeshapes.capture.controller.listener.CCDDownloadListener;
+import uk.co.iseeshapes.capture.controller.listener.CCDExposureListener;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 
-public class CCDExposureController implements INDIPropertyListener, INDIElementListener {
+public class CCDExposureController {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(CCDExposureController.class);
 
@@ -24,50 +23,22 @@ public class CCDExposureController implements INDIPropertyListener, INDIElementL
     private static final String downloadPropertyName = "CCD1";
     private static final String downloadElementName = "CCD1";
 
-    private enum ExposureStatus { waiting, acquiring, downloading, completed, aborted }
-
     private INDIConnection indiConnection;
     private INDIServerConnection indiServerConnection;
     private PrintStream out;
-    private ApplicationConfiguration applicationConfiguration;
-    private final double exposure;
-    private final int numberOfFrames;
-    private final File file;
-    private final int imageNumber;
+    private int lineLength;
     private final String cameraName;
-    private final UploadMode uploadMode;
-    private final boolean silent;
-
-    private ExposureStatus exposureStatus;
-
-    private INDINumberProperty exposureProperty;
-    private INDINumberElement exposureElement;
-    private INDIElement downloadElement;
 
     public CCDExposureController(INDIConnection indiConnection, INDIServerConnection indiServerConnection,
-                                 PrintStream out, ApplicationConfiguration applicationConfiguration,
-                                 double exposure, int numberOfFrames, File file, int imageNumber,
-                                 String cameraName, UploadMode uploadMode, boolean silent) {
+                                 PrintStream out, String cameraName, int lineLength) {
         this.indiConnection = indiConnection;
         this.indiServerConnection = indiServerConnection;
         this.out = out;
-        this.applicationConfiguration = applicationConfiguration;
-        this.exposure = exposure;
-        this.numberOfFrames = numberOfFrames;
-        this.file = file;
-        this.imageNumber = imageNumber;
         this.cameraName = cameraName;
-        this.uploadMode = uploadMode;
-        this.silent = silent;
-
-        exposureStatus = ExposureStatus.waiting;
+        this.lineLength = lineLength;
     }
 
-
     private void sendCapture (double time) throws IOException {
-        exposureElement = (INDINumberElement)indiServerConnection.getElement(cameraName, exposurePropertyName, exposureElementName);
-        exposureProperty = (INDINumberProperty)exposureElement.getProperty();
-
         NewNumberVector vector = new NewNumberVector();
         vector.setDevice(cameraName);
         vector.setName(exposurePropertyName);
@@ -79,109 +50,91 @@ public class CCDExposureController implements INDIPropertyListener, INDIElementL
         number.setTextContent(Double.toString(time));
         vector.addElement(number);
 
-        if (uploadMode != UploadMode.local) {
-            exposureElement.addINDIElementListener(this);
-        }
-        exposureProperty.addINDIPropertyListener(this);
-
-        exposureStatus = ExposureStatus.acquiring;
         indiConnection.getINDIOutputStream().writeObject(vector);
     }
 
-    public void start () throws IOException {
-        downloadElement = null;
-
-        sendCapture(exposure);
-
-        while (exposureStatus != ExposureStatus.completed && exposureStatus != ExposureStatus.aborted) {
-            if (uploadMode != UploadMode.local && downloadElement == null) {
-                downloadElement = indiServerConnection.getElement(cameraName, downloadPropertyName, downloadElementName);
-                if (downloadElement != null) {
-                    downloadElement.addINDIElementListener(this);
-                    downloadElement.getProperty().getDevice().blobsEnable(Constants.BLOBEnables.ALSO);
-                }
+    public void capture (double exposure, File file, int imageNumber, int numberOfFrames, boolean verbose) throws IOException {
+        INDINumberElement exposureElement = (INDINumberElement)indiServerConnection.getElement(cameraName,
+                exposurePropertyName, exposureElementName);
+        INDINumberProperty exposureProperty = (INDINumberProperty)exposureElement.getProperty();
+        CCDExposureListener exposureListener;
+        if (verbose) {
+            if (file == null) {
+                exposureListener = new CCDExposureListener(exposureProperty, exposureElement, out, exposure,
+                        "Preview", lineLength);
+            } else if (numberOfFrames == 0){
+                exposureListener = new CCDExposureListener(exposureProperty, exposureElement, out, exposure,
+                        file.getName(), lineLength);
+            } else {
+                exposureListener = new CCDExposureListener(exposureProperty, exposureElement, out, exposure,
+                        file.getName(), lineLength, imageNumber, numberOfFrames);
             }
+        } else {
+            exposureListener = new CCDExposureListener(exposureProperty, exposureElement);
+        }
+        sendCapture(exposure);
+        while (!exposureListener.isComplete()) {
             try {
-                Thread.sleep(500L);
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                log.error("Thread interrupted", e);
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public void capture (double exposure, boolean verbose) throws IOException {
+        capture(exposure, null, 0, 0, verbose);
+    }
+
+    private CCDDownloadListener createDownloadListener (File file, int imageNumber, int numberOfFrames)
+            throws IOException {
+        INDIBLOBElement downloadElement = null;
+
+        while (downloadElement == null) {
+            downloadElement = (INDIBLOBElement)indiServerConnection.getElement(cameraName,
+                    downloadPropertyName, downloadElementName);
+            try {
+                Thread.sleep(250);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.error ("Exposure thread interrupted", e);
             }
         }
-        exposureProperty.removeINDIPropertyListener(this);
-        exposureElement.removeINDIElementListener(this);
-        if (downloadElement != null) {
-            downloadElement.removeINDIElementListener(this);
+
+        CCDDownloadListener downloadListener;
+        if (numberOfFrames > 0) {
+            downloadListener = new CCDDownloadListener(downloadElement, out, file, lineLength, numberOfFrames,
+                    imageNumber);
+        } else {
+            downloadListener = new CCDDownloadListener(downloadElement, out, file, lineLength);
         }
+
+        downloadElement.getProperty().getDevice().blobsEnable(Constants.BLOBEnables.ALSO);
+
+        return downloadListener;
     }
 
-    @Override
-    public void propertyChanged(INDIProperty indiProperty) {
-        INDINumberProperty numberProperty = (INDINumberProperty)indiProperty;
-        if (numberProperty.getState() == PropertyStates.OK) {
-            exposureProperty.removeINDIPropertyListener(this);
-            exposureElement.removeINDIElementListener(this);
-            if (uploadMode == UploadMode.local) {
-                exposureStatus = ExposureStatus.completed;
-            }
-        }
-    }
-
-    private void updateExposureTime (double time) {
-        double displayExposure = Math.ceil(exposure);
-
-        String lineStart = String.format("\r%3d of %3d => %s ", imageNumber, numberOfFrames, file.getName());
-
-        int percent = (int)Math.round((time * 100)/displayExposure);
-        String lineEnd = String.format(" %3d/%3d (%2d%%)", (int)Math.round(displayExposure - time), (int)displayExposure, percent);
-
-        out.print(lineStart);
-
-        int steps = applicationConfiguration.getLineLength() - lineStart.length() - lineEnd.length();
-        double step = displayExposure / steps;
-        double position = 0.0;
-        while (position < displayExposure - time) {
-            out.print("=");
-            position += step;
-        }
-        if (position < displayExposure) {
-            out.print(">");
-            position += step;
-        }
-        while (position < displayExposure) {
-            out.print(" ");
-            position += step;
-        }
-        out.print(lineEnd);
-    }
-
-    @Override
-    public void elementChanged(INDIElement indiElement) {
-        if (exposureElement.equals(indiElement)) {
-            if (exposureStatus == ExposureStatus.acquiring && !silent) {
-                INDINumberElement numberElement = (INDINumberElement) indiElement;
-                updateExposureTime(numberElement.getValue());
-            }
-        } else if (downloadElement != null && downloadElement.equals(indiElement)) {
-            exposureStatus = ExposureStatus.downloading;
-            indiElement.removeINDIElementListener(this);
-            INDIBLOBElement blob = (INDIBLOBElement)indiElement;
+    private void download (CCDDownloadListener downloadListener) {
+        while (!downloadListener.isComplete()) {
             try {
-                blob.getValue().saveBLOBData(file);
-            } catch (IOException e) {
-                out.print('\n');
-                log.error("Unable to download file", e);
-                exposureStatus = ExposureStatus.aborted;
-                return;
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-            if (!silent) {
-                out.print('\r');
-                for (int i = 0; i < applicationConfiguration.getLineLength(); i++) {
-                    out.print(' ');
-                }
-                out.printf("\rCompleted - %d of %d - %s%n", imageNumber, numberOfFrames, file.getName());
-            }
-            exposureStatus = ExposureStatus.completed;
         }
+    }
+
+    public void captureAndDownload (double exposure, File file, int imageNumber)
+            throws IOException {
+        CCDDownloadListener downloadListener = createDownloadListener(file, 0, 0);
+        capture(exposure, file, imageNumber, 0, true);
+        download(downloadListener);
+    }
+
+    public void captureAndDownload (double exposure, File file, int imageNumber, int numberOfFrames)
+            throws IOException {
+        CCDDownloadListener downloadListener = createDownloadListener(file, imageNumber, numberOfFrames);
+        capture(exposure, file, imageNumber, numberOfFrames, true);
+        download(downloadListener);
     }
 }

@@ -62,12 +62,4 @@ public abstract class AbstractScript {
     }
 
     public abstract void run () throws IOException, AbortException;
-
-    public void finish () {
-        try {
-            indiConnection.close();
-        } catch (IOException e) {
-            log.debug("Error closing connection", e);
-        }
-    }
 }
