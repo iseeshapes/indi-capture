@@ -3,6 +3,7 @@ package uk.co.iseeshapes.capture.configuration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import uk.co.iseeshapes.capture.AbortException;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,44 +18,62 @@ public class ConfigurationManager {
         this.objectMapper = objectMapper;
     }
 
-    public <T> T findConfiguration (String[] args, String shortArgument, String longArgument,
-                                            String environmentVariable, String localFilename, Class<T> clazz) {
-        File file = null;
-        String filename = null;
+    public File findArgument (String[] args, String shortArgument, String longArgument) throws AbortException {
+        File file;
         for (int i=0;i<args.length;i++) {
             if (shortArgument.equals(args[i]) || longArgument.equals(args[i])) {
                 if (i == args.length -1) {
-                    log.error("No file name after {} / {}", shortArgument, longArgument);
-                    return null;
+                    throw new AbortException("No file name after " + shortArgument + " / " + longArgument);
                 }
-                filename = args[i+1];
-                break;
-            }
-        }
-        if (environmentVariable != null && filename == null) {
-            filename = System.getenv(environmentVariable);
-            if (filename != null) {
-                file = new File(filename);
+                file = new File(args[i+1]);
                 if (!file.exists()) {
-                    log.error("Cannot find configuration file - {}", filename);
-                    return null;
+                    throw new AbortException("Cannot find configuration file \"" + args[i+1] + "\" width argument \""
+                            + args[i] + "\"");
                 }
+                return file;
             }
         }
-        if (filename == null) {
-            file = new File(localFilename);
-            if (!file.exists()) {
-                return null;
+        return null;
+    }
+
+    public File findEnvironmentVariable (String environmentVariable) throws AbortException {
+        if (environmentVariable != null) {
+            String filename = System.getenv(environmentVariable);
+            if (filename != null) {
+                File file = new File(filename);
+                if (!file.exists()) {
+                    throw new AbortException("Cannot find configuration file \"" + filename
+                            + "\" with environment variable \"" + environmentVariable + "\"");
+                }
+                return file;
             }
         }
-        T configuration;
+        return null;
+    }
+
+    private File findLocalFile (String localFilename) throws AbortException {
+        File file = new File(localFilename);
+        if (!file.exists()) {
+            throw new AbortException("Cannot find local configuration file - " + localFilename);
+        }
+        return file;
+    }
+
+    public <T> T findConfiguration (String[] args, String shortArgument, String longArgument,
+                                    String environmentVariable, String localFilename, Class<T> clazz)
+            throws AbortException {
+        File file = findArgument(args, shortArgument, longArgument);
+        if (file == null) {
+            file = findEnvironmentVariable(environmentVariable);
+        }
+        if (file == null) {
+            file = findLocalFile(localFilename);
+        }
         try {
-            configuration = objectMapper.readValue(file, clazz);
+            return objectMapper.readValue(file, clazz);
         } catch (IOException e) {
-            log.error("Failed read configuration file: {}\nError: {}", filename, e.getMessage());
-            return null;
+            throw new AbortException("Failed read configuration file: " + file.getName(), e);
         }
-        return configuration;
     }
 
     public void writeConfiguration (String localFilename, Object configuration) throws IOException {

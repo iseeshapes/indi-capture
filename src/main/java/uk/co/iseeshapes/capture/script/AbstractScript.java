@@ -5,6 +5,7 @@ import org.indilib.i4j.protocol.api.INDIConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import uk.co.iseeshapes.capture.AbortException;
+import uk.co.iseeshapes.capture.MyServerConnection;
 import uk.co.iseeshapes.capture.configuration.ApplicationConfiguration;
 import uk.co.iseeshapes.capture.configuration.ConfigurationManager;
 
@@ -49,7 +50,7 @@ public abstract class AbstractScript {
         URL indiUrl = new URL("indi", applicationConfiguration.getUrl(), applicationConfiguration.getPort(), "/");
         indiConnection = (INDIConnection)indiUrl.openConnection();
 
-        indiServerConnection = new INDIServerConnection(indiConnection);
+        indiServerConnection = new MyServerConnection(indiConnection);
         indiServerConnection.connect();
         indiServerConnection.askForDevices();
 
