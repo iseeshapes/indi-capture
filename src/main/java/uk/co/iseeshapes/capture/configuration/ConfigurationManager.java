@@ -12,7 +12,7 @@ public class ConfigurationManager {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(ConfigurationManager.class);
 
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper;
 
     public ConfigurationManager (ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -36,14 +36,15 @@ public class ConfigurationManager {
         return null;
     }
 
-    public File findEnvironmentVariable (String environmentVariable) throws AbortException {
+    public File findEnvironmentVariable (String environmentVariable) {
         if (environmentVariable != null) {
             String filename = System.getenv(environmentVariable);
             if (filename != null) {
                 File file = new File(filename);
                 if (!file.exists()) {
-                    throw new AbortException("Cannot find configuration file \"" + filename
-                            + "\" with environment variable \"" + environmentVariable + "\"");
+                    log.info ("Cannot find configuration file \"{}\" with environment variable \"{}\"", filename,
+                            environmentVariable);
+                    return null;
                 }
                 return file;
             }
@@ -51,10 +52,11 @@ public class ConfigurationManager {
         return null;
     }
 
-    private File findLocalFile (String localFilename) throws AbortException {
+    private File findLocalFile (String localFilename) {
         File file = new File(localFilename);
         if (!file.exists()) {
-            throw new AbortException("Cannot find local configuration file - " + localFilename);
+            log.info ("Cannot find local configuration file - {}", localFilename);
+            return null;
         }
         return file;
     }
@@ -64,10 +66,13 @@ public class ConfigurationManager {
             throws AbortException {
         File file = findArgument(args, shortArgument, longArgument);
         if (file == null) {
+            file = findLocalFile(localFilename);
+        }
+        if (file == null) {
             file = findEnvironmentVariable(environmentVariable);
         }
         if (file == null) {
-            file = findLocalFile(localFilename);
+            return null;
         }
         try {
             return objectMapper.readValue(file, clazz);

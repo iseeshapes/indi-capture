@@ -27,7 +27,7 @@ public abstract class AbstractCaptureScript extends AbstractScript {
 
     private static final String shortCameraArgument = "-k";
     private static final String longCameraArgument = "--camera";
-    private static final String environmentCameraVariable = null;
+    private static final String environmentCameraVariable = "CAPTURE_CAMERA_CONFIGURATION";
     private static final String localCameraFilename = "camera.json";
 
     private static final Pattern filenamePattern = Pattern.compile("(.*)-(\\d+)s-(\\d+)-(\\d{8}T\\d{6})\\.fits");
