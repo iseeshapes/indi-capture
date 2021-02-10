@@ -25,9 +25,9 @@ public class CCDUploadController {
 
     private static final long timeout = 50000;
 
-    private INDIConnection indiConnection;
-    private INDIServerConnection indiServerConnection;
-    private String cameraName;
+    private final INDIConnection indiConnection;
+    private final INDIServerConnection indiServerConnection;
+    private final String cameraName;
 
     public CCDUploadController(INDIConnection indiConnection, INDIServerConnection indiServerConnection,
                                String cameraName) {

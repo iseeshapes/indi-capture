@@ -20,9 +20,9 @@ public class DeviceConnectionController implements INDIPropertyListener {
     private static final String connectElementName = "CONNECT";
     private static final String disconnectElementName = "DISCONNECT";
 
-    private INDIConnection indiConnection;
-    private INDIServerConnection indiServerConnection;
-    private String deviceName;
+    private final INDIConnection indiConnection;
+    private final INDIServerConnection indiServerConnection;
+    private final String deviceName;
 
     public DeviceConnectionController(INDIConnection indiConnection, INDIServerConnection indiServerConnection,
                                       String deviceName) {

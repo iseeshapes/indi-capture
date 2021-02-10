@@ -14,15 +14,15 @@ public class CCDDownloadListener implements INDIElementListener {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(CCDDownloadListener.class);
 
-    private INDIBLOBElement downloadElement;
-    private PrintStream out;
-    private File file;
-    private int lineLength;
-    private int numberOfFrames;
-    private int imageNumber;
+    private final INDIBLOBElement downloadElement;
+    private final PrintStream out;
+    private final File file;
+    private final int lineLength;
+    private final int numberOfFrames;
+    private final int imageNumber;
 
     private boolean complete;
-    private boolean displayFrames;
+    private final boolean displayFrames;
 
     private CCDDownloadListener(INDIBLOBElement downloadElement, PrintStream out, File file, int lineLength,
                                 int numberOfFrames, int imageNumber, boolean displayFrames) {
@@ -75,7 +75,7 @@ public class CCDDownloadListener implements INDIElementListener {
             out.print(' ');
         }
         if (displayFrames) {
-            out.printf("\rCompleted - %d of %d - %s%n", imageNumber, numberOfFrames, file.getName());
+            out.printf("\rCompleted - %4d of %4d - %s%n", imageNumber, numberOfFrames, file.getName());
         } else {
             out.printf("\rCompleted - %s", file.getName());
         }

@@ -24,11 +24,13 @@ public class CaptureConfiguration extends AbstractCaptureConfiguration {
 
     @JsonCreator
     public CaptureConfiguration(@JsonProperty(prefixKey) String prefix,
+                                @JsonProperty(filterKey) String filter,
                                 @JsonProperty(temperatureKey) Double temperature,
                                 @JsonProperty(toleranceKey) Double tolerance,
                                 @JsonProperty(exposureKey) Double exposure,
-                                @JsonProperty(noOfFramesKey) Integer noOfFrames) {
-        super(prefix, temperature, tolerance, exposure);
+                                @JsonProperty(noOfFramesKey) Integer noOfFrames,
+                                @JsonProperty(pingKey) Boolean ping) {
+        super(prefix, filter, temperature, tolerance, exposure, ping);
 
         this.noOfFrames = noOfFrames;
     }

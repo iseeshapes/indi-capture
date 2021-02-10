@@ -12,8 +12,8 @@ public class CCDTemperatureListener implements INDIElementListener {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(CCDTemperatureListener.class);
 
-    private INDINumberElement numberElement;
-    private PrintStream out;
+    private final INDINumberElement numberElement;
+    private final PrintStream out;
 
     private final double startTemperature;
     private final double targetTemperature;

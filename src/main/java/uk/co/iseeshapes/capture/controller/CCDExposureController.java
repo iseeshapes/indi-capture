@@ -23,10 +23,10 @@ public class CCDExposureController {
     private static final String downloadPropertyName = "CCD1";
     private static final String downloadElementName = "CCD1";
 
-    private INDIConnection indiConnection;
-    private INDIServerConnection indiServerConnection;
-    private PrintStream out;
-    private int lineLength;
+    private final INDIConnection indiConnection;
+    private final INDIServerConnection indiServerConnection;
+    private final PrintStream out;
+    private final int lineLength;
     private final String cameraName;
 
     public CCDExposureController(INDIConnection indiConnection, INDIServerConnection indiServerConnection,

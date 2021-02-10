@@ -21,6 +21,7 @@ public class Main {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         ApplicationContext applicationContext = new AnnotationConfigApplicationContext(SpringConfiguration.class);
         AbstractScript script = applicationContext.getBean(args[0], AbstractScript.class);
+
         try {
             script.initialise(args, reader, System.out);
             script.run();

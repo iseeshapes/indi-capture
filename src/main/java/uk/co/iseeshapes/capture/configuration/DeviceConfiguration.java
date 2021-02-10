@@ -56,6 +56,9 @@ public class DeviceConfiguration {
     }
 
     public void assignDevice (String[] deviceNames) throws AbortException {
+        if (deviceNames.length == 0) {
+            throw new AbortException("No devices connected to the server");
+        }
         out.println("The following devices are connected to the server:");
         Integer selected = null;
         for (int i=0;i<deviceNames.length;i++) {

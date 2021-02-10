@@ -63,6 +63,21 @@ public abstract class AbstractConfiguration {
         }
     }
 
+    private final Pattern yesPattern = Pattern.compile("[Yy]|[Yy][Ee][Ss]");
+    private final Pattern noPattern = Pattern.compile("[Nn]|[Nn][Oo]");
+
+    protected Boolean parseBoolean (String rawValue) {
+        Matcher matcher = yesPattern.matcher(rawValue.trim());
+        if (matcher.matches()) {
+            return true;
+        }
+        matcher = noPattern.matcher(rawValue.trim());
+        if (matcher.matches()) {
+            return true;
+        }
+        return null;
+    }
+
     public abstract void fillInBlanks () throws IOException, AbortException;
 
     public abstract void ask () throws IOException, AbortException;

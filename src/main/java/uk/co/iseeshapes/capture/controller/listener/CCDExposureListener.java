@@ -11,18 +11,18 @@ public class CCDExposureListener implements INDIPropertyListener, INDIElementLis
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(CCDExposureListener.class);
 
-    private INDINumberProperty exposureProperty;
-    private INDINumberElement exposureElement;
-    private boolean verbose;
-    private PrintStream out;
-    private double exposure;
-    private String filename;
-    private int lineLength;
-    private int numberOfFrames;
-    private int imageNumber;
+    private final INDINumberProperty exposureProperty;
+    private final INDINumberElement exposureElement;
+    private final boolean verbose;
+    private final PrintStream out;
+    private final double exposure;
+    private final String filename;
+    private final int lineLength;
+    private final int numberOfFrames;
+    private final int imageNumber;
 
     private boolean complete;
-    private boolean displayFrames;
+    private final boolean displayFrames;
 
     private CCDExposureListener(INDINumberProperty exposureProperty, INDINumberElement exposureElement, PrintStream out,
                                 double exposure, String filename, int lineLength, int imageNumber, int numberOfFrames,
@@ -88,13 +88,14 @@ public class CCDExposureListener implements INDIPropertyListener, INDIElementLis
 
         String lineStart;
         if (displayFrames) {
-            lineStart = String.format("\r%3d of %3d => %s ", imageNumber, numberOfFrames, filename);
+            lineStart = String.format("\r%4d of %4d => %s ", imageNumber, numberOfFrames, filename);
         } else {
             lineStart = String.format("\r%s ", filename);
         }
 
-        int percent = (int)Math.round((time * 100)/displayExposure);
-        String lineEnd = String.format(" %3d/%3d (%2d%%)", (int)Math.round(displayExposure - time), (int)displayExposure, percent);
+        int percent = 100 - (int)Math.round((time * 100) / displayExposure);
+        String lineEnd = String.format(" %4d/%4d (%2d%%)", (int)Math.round(displayExposure - time),
+                (int)displayExposure, percent);
 
         out.print(lineStart);
 

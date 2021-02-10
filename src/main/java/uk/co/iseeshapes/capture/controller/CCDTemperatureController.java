@@ -21,11 +21,11 @@ public class CCDTemperatureController {
     private static final String temperaturePropertyName = "CCD_TEMPERATURE";
     private static final String temperatureElementName = "CCD_TEMPERATURE_VALUE";
 
-    private INDIServerConnection indiServerConnection;
-    private INDIConnection indiConnection;
-    private PrintStream out;
-    private String cameraName;
-    private int lineLength;
+    private final INDIServerConnection indiServerConnection;
+    private final INDIConnection indiConnection;
+    private final PrintStream out;
+    private final String cameraName;
+    private final int lineLength;
 
     public CCDTemperatureController(INDIServerConnection indiServerConnection, INDIConnection indiConnection,
                                     PrintStream out, String cameraName, int lineLength) {

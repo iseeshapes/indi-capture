@@ -1,1 +1,1 @@
-java -cp build/libs/capture.jar uk.co.iseeshapes.capture.Main capture -a ../application-astro-vm.json
+java -cp build/libs/capture.jar uk.co.iseeshapes.capture.Main capture -a test/application-astro-vm.json

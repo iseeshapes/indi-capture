@@ -8,21 +8,16 @@ import org.slf4j.LoggerFactory;
 import uk.co.iseeshapes.capture.AbortException;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ContinuousConfiguration extends AbstractCaptureConfiguration {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(ContinuousConfiguration.class);
 
-    private static final Pattern yesPattern = Pattern.compile("[yY]|[yY]es");
-    private static final Pattern noPattern = Pattern.compile("[nN]|[nN]o");
+    @JsonIgnore
+    private boolean saveFile;
 
     @JsonIgnore
-    private Boolean saveFile;
-
-    @JsonIgnore
-    private Boolean continuous;
+    private boolean continuous;
 
     public ContinuousConfiguration() {
         saveFile = false;
@@ -31,10 +26,12 @@ public class ContinuousConfiguration extends AbstractCaptureConfiguration {
 
     @JsonCreator
     public ContinuousConfiguration(@JsonProperty(prefixKey) String prefix,
+                                   @JsonProperty(filterKey) String filter,
                                    @JsonProperty(temperatureKey) Double temperature,
                                    @JsonProperty(toleranceKey) Double tolerance,
-                                   @JsonProperty(exposureKey) Double exposure) {
-        super(prefix, temperature, tolerance, exposure);
+                                   @JsonProperty(exposureKey) Double exposure,
+                                   @JsonProperty(pingKey) Boolean ping) {
+        super(prefix, filter, temperature, tolerance, exposure, ping);
 
         saveFile = false;
         continuous = false;
@@ -51,31 +48,11 @@ public class ContinuousConfiguration extends AbstractCaptureConfiguration {
     }
 
     public void setPreview ()  throws IOException, AbortException {
-        saveFile = readValue("Save File [y/n]", false, (String rawMessage) -> {
-            Matcher matcher = yesPattern.matcher(rawMessage);
-            if (matcher.matches()) {
-                return true;
-            }
-            matcher = noPattern.matcher(rawMessage);
-            if (matcher.matches()) {
-                return false;
-            }
-            return null;
-        });
+        saveFile = readValue("Save File [y/n]", true, this::parseBoolean);
     }
 
     public void setContinuous ()  throws IOException, AbortException {
-        continuous = readValue("Continuous [y/n]", true, (String rawMessage) -> {
-            Matcher matcher = yesPattern.matcher(rawMessage);
-            if (matcher.matches()) {
-                return true;
-            }
-            matcher = noPattern.matcher(rawMessage);
-            if (matcher.matches()) {
-                return false;
-            }
-            return null;
-        });
+        continuous = readValue("Continuous [y/n]", true, this::parseBoolean);
     }
 
     @Override
@@ -85,7 +62,9 @@ public class ContinuousConfiguration extends AbstractCaptureConfiguration {
         if (saveFile && prefix == null) {
             setPrefix("Missing Filename Prefix", null);
         }
-
+        if (saveFile && filter == null) {
+            setFilter("Missing Filter", null);
+        }
         if (temperature == null) {
             setTemperature("Missing Temperature", null);
         }
@@ -105,6 +84,7 @@ public class ContinuousConfiguration extends AbstractCaptureConfiguration {
 
         if (saveFile) {
             setPrefix("Filename", prefix);
+            setFilter("Filter", filter);
         }
         setTemperature("Temperature", temperature);
         setTolerance("Temperature Tolerance", tolerance);
