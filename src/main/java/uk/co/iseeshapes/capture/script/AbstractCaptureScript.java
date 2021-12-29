@@ -34,7 +34,7 @@ public abstract class AbstractCaptureScript extends AbstractScript {
 
     private static final Pattern filenamePattern = Pattern.compile("(.*)-(\\d+)s-(.*)-(\\d+)-(\\d{8}T\\d{6})\\.fits");
 
-    private final SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'kkmmss");
+    private final SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd'T'HHmmss");
 
     private final CaptureSounds captureSounds;
 

@@ -11,9 +11,11 @@ import java.security.CodeSource;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-public class UrlCaptureSounds implements CaptureSounds {
+public class UrlCaptureSounds implements CaptureSounds, LineListener {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(UrlCaptureSounds.class);
+
+    private boolean waitForPlayback = false;
 
     public UrlCaptureSounds() {
         CodeSource codeSource = UrlCaptureSounds.class.getProtectionDomain().getCodeSource();
@@ -23,7 +25,7 @@ public class UrlCaptureSounds implements CaptureSounds {
             while ((entry = zin.getNextEntry()) != null) {
                 String name = entry.getName();
                 if (name.endsWith(".wav")) {
-                    log.info("Found .wav : {}", name);
+                    log.debug("Found .wav : {}", name);
                 }
             }
         } catch (IOException e) {
@@ -35,9 +37,16 @@ public class UrlCaptureSounds implements CaptureSounds {
         try {
             Clip clip = AudioSystem.getClip();
             clip.open(AudioSystem.getAudioInputStream(url));
+            clip.addLineListener(this);
             clip.start();
+            waitForPlayback = true;
+            while (waitForPlayback) {
+                Thread.sleep(500);
+            }
+        } catch (InterruptedException e) {
+            //Now carry on
         } catch (LineUnavailableException | IOException | UnsupportedAudioFileException e) {
-            log.error("Cannot play sound {}", url.getPath());
+            log.error("Cannot play sound {}", url.getPath(), e);
         }
     }
 
@@ -51,5 +60,10 @@ public class UrlCaptureSounds implements CaptureSounds {
     public void playEndSequence () {
         URL url = UrlCaptureSounds.class.getResource("/wav/107341__thompsonman__beeps.wav");
         playSound(url);
+    }
+
+    @Override
+    public void update(LineEvent event) {
+        waitForPlayback = event.getType() == LineEvent.Type.START;
     }
 }

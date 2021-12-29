@@ -12,7 +12,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintStream;
 
-public class Capture extends AbstractCaptureScript{
+public class Capture extends AbstractCaptureScript {
     @SuppressWarnings("unused")
     private static final Logger log = LoggerFactory.getLogger(Capture.class);
 

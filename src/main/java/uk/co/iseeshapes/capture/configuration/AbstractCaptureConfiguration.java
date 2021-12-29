@@ -58,6 +58,7 @@ public abstract class AbstractCaptureConfiguration extends AbstractConfiguration
         temperature = null;
         tolerance = null;
         exposure = null;
+        ping = null;
     }
 
     public String getPrefix() {
